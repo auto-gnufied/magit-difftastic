@@ -204,6 +204,42 @@ element is one displayed chunk's body (the header line dropped)."
     (should (= (length (magit-difftastic--split-hunks text)) 2)))
   (should (null (magit-difftastic--split-hunks ""))))
 
+;;;; Unit tests: difftastic chunk headers ---------------------------------
+
+(ert-deftest magit-difftastic--chunk-header-line-p/text-fallback ()
+  "Text fallback headers tolerate diagnostics added by newer difft versions."
+  (let ((header-re (difftastic--chunk-regexp t)))
+    (dolist (file '("status_manager_test.go" " status_manager_test.go"))
+      (dolist (trailer '("Go"
+                         "Text"
+                         "Text (2 Go parse errors, exceeded DFT_PARSE_ERROR_LIMIT)"
+                         "Text (2 Go parse errors, exceeded DFT_PARSE_ERROR_LIMIT, first at 539:45)"
+                         "Text (exceeded DFT_GRAPH_LIMIT)"
+                         "Text (1.00 MiB exceeded DFT_BYTE_LIMIT)"))
+        (dolist (number '("" " --- 1/8"))
+          (should (magit-difftastic--chunk-header-line-p
+                   header-re (concat file number " --- " trailer))))))
+    (dolist (line '("" "ordinary diff body"
+                     "status_manager_test.go --- Text (unterminated"
+                     "status_manager_test.go --- Text (diagnostic) trailing"))
+      (should-not (magit-difftastic--chunk-header-line-p header-re line)))))
+
+(ert-deftest magit-difftastic--split-chunk-bodies/parse-error-location ()
+  "Keep every body when eight headers contain parse-error locations."
+  (let* ((bodies (cl-loop for n from 1 to 8
+                          collect (list (format "  %d old" n)
+                                        (format "    %d new" n))))
+         (rendered
+          (mapconcat
+           (lambda (n)
+             (format (concat "pkg/kubelet/status/status_manager_test.go"
+                             " --- %d/8 --- Text (2 Go parse errors,"
+                             " exceeded DFT_PARSE_ERROR_LIMIT, first at 539:45)\n%s")
+                     n (string-join (nth (1- n) bodies) "\n")))
+           (number-sequence 1 8) "\n")))
+    (should (equal (magit-difftastic--split-chunk-bodies rendered) bodies))
+    (should (magit-difftastic--text-diff-p rendered))))
+
 ;;;; Unit tests: hunk overlap ----------------------------------------------
 
 (ert-deftest magit-difftastic--hunk-covers-p/old-side ()

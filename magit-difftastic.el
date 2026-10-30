@@ -2127,17 +2127,17 @@ section displays even when difft's text display merges several JSON chunks."
                ")"))
       eol)
   "Regexp matching the ` --- LANG' or ` --- Text (...)' trailer of a chunk header.
-Fallback for `difftastic--chunk-regexp' when the path begins with whitespace.")
+Fallback for paths beginning with whitespace and newer text diagnostics.")
 
 (defun magit-difftastic--chunk-header-line-p (header-re line)
   "Return non-nil when LINE is a difftastic chunk header.
-Tries HEADER-RE first; falls back to the trailer regexp for lines starting with
-whitespace, which `difftastic--chunk-regexp' incorrectly rejects."
+Tries HEADER-RE first; falls back to the trailer regexp for paths beginning
+with whitespace and text diagnostics unsupported by `difftastic--chunk-regexp'."
   (or (string-match-p header-re line)
-      ;; `difftastic--chunk-regexp' anchors the filename group with
-      ;; `(not " ")', so it never matches a path that begins with a space.
-      ;; Detect those with the trailer regexp instead.
-      (and (string-match-p (rx bos " ") line)
+      ;; Upstream rejects paths beginning with a space and may not recognize
+      ;; newer Text diagnostics, e.g. a parse error's ", first at LINE:COL".
+      (and (or (string-match-p (rx bos " ") line)
+               (string-match-p (rx " --- Text (") line))
            (string-match-p magit-difftastic--chunk-header-trailer-re line))))
 
 (defun magit-difftastic--text-diff-p (rendered)
